@@ -162,6 +162,30 @@
 .xp-clients { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .xp-clients span { font-family: "Space Mono", monospace; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 10px; border: 1px solid rgba(200,255,0,0.3); color: var(--lime); }
 @media (max-width: 900px) { .xp-card { grid-template-columns: 1fr; gap: 18px; padding: 28px; } }
+
+/* PHONES AND TABLETS */
+@media (max-width: 900px) {
+  .hero-right { height: 460px; }
+  .hero-float-card { top: 36px; right: max(16px, calc(50% - 250px)); }
+  .hero-float-card2 { bottom: 36px; left: max(16px, calc(50% - 240px)); }
+}
+@media (max-width: 700px) {
+  section { padding: 56px 20px; }
+  .hero-left { padding: 44px 20px 24px; }
+  .hero-right { height: 400px; }
+  .photo-wrap { width: 220px; height: 220px; }
+  .hero-float-card { top: 14px; right: 16px; padding: 12px 14px; }
+  .hero-float-card2 { bottom: 14px; left: 16px; padding: 12px 14px; }
+  .metrics-row, .analytics-grid { grid-template-columns: 1fr; }
+  .metrics-block { padding: 26px 20px; }
+  .metric-item { gap: 16px; }
+  .metric-num { font-size: 36px; min-width: 88px; }
+  .why-card, .stat-card { padding: 26px 22px; }
+  .xp-card { padding: 24px 20px; }
+  .xp-head { font-size: 24px; padding-right: 0; }
+  .xp-num { font-size: 72px; }
+  .footer-cta, .footer-bar { padding: 56px 20px; }
+}
 </style>
 </head>
 <body>
