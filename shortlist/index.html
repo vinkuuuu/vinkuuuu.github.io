@@ -18,14 +18,21 @@ html, body { margin: 0; background: #070708; }
 .vt-lock .t { font-family: 'Space Mono', monospace; font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: #C8FF00; }
 .vt-lock h1 { font-family: 'Bebas Neue', Impact, sans-serif; font-weight: 400; font-size: clamp(64px, 14vw, 112px); line-height: .85; margin: 0; }
 .vt-lock h1 em { font-style: normal; color: #C8FF00; }
-.vt-lock input[type=password] { width: 100%; box-sizing: border-box; padding: 15px 16px; border-radius: 3px; border: 1px solid rgba(255,255,255,.2);
+.vt-lock #vt-pw { width: 100%; box-sizing: border-box; padding: 15px 16px; border-radius: 3px; border: 1px solid rgba(255,255,255,.2);
   background: #0c0c0f; color: #F5F5F0; font: 15px 'Space Mono', monospace; outline: none; }
-.vt-lock input[type=password]:focus { border-color: #C8FF00; }
+.vt-lock #vt-pw:focus { border-color: #C8FF00; }
 .vt-lock label.r { display: flex; gap: 10px; align-items: center; font-size: 13.5px; color: rgba(245,245,240,.66); }
 .vt-lock button { font: 700 12px 'Space Mono', monospace; letter-spacing: .14em; text-transform: uppercase; padding: 16px 26px; border: 0;
   border-radius: 3px; background: #C8FF00; color: #070708; cursor: pointer; }
 .vt-lock button:disabled { opacity: .6; cursor: wait; }
 .vt-lock .e { margin: 0; font: 12px 'Space Mono', monospace; color: #FF5A5A; }
+.vt-lock .h { margin: 0; font-size: 13.5px; line-height: 1.55; color: rgba(245,245,240,.66); }
+.vt-lock button.lnk { justify-self: start; padding: 4px 0; background: none; color: rgba(245,245,240,.66); font: 13.5px 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0; text-transform: none; text-decoration: underline; text-underline-offset: 3px; }
+.vt-note { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); bottom: 64px; z-index: 40;
+  max-width: 460px; margin-left: auto; padding: 14px 16px; border-radius: 3px; border: 1px solid rgba(200,255,0,.4); background: #0c0c0f; color: #F5F5F0;
+  font: 13.5px/1.55 'DM Sans', system-ui, sans-serif; }
+.vt-note[hidden] { display: none; }
 .vt-out { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 16px; z-index: 40; font: 700 10.5px 'Space Mono', monospace;
   letter-spacing: .14em; text-transform: uppercase; padding: 9px 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,.2);
   background: #0c0c0f; color: #F5F5F0; cursor: pointer; }
@@ -55,12 +62,15 @@ window.dash = (() => {
     status = 'ok';
     cbs.forEach((f) => f());
   };
-  const login = async (pw) => {
+  // The data key is wrapped twice: once by the password, once by the recovery code kept in the owner's email.
+  const login = async (secret, recovery) => {
     const ring = await (await fetch('keyring.json', { cache: 'no-store' })).json();
-    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
-    const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(ring.salt), iterations: ring.iterations, hash: 'SHA-256' },
+    const s = recovery ? ring.recovery : ring;
+    if (recovery) secret = secret.replace(/[\s-]/g, '').toUpperCase();
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, ['deriveKey']);
+    const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(s.salt), iterations: ring.iterations, hash: 'SHA-256' },
       base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(ring.iv) }, kek, b64(ring.wrapped)));
+    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(s.iv) }, kek, b64(s.wrapped)));
   };
   return { calc: (id, o) => { calcs[id] = o; }, data: get, onData: (f) => { cbs.push(f); f(); }, login, unlock, openFile };
 })();
@@ -71,12 +81,15 @@ window.dash = (() => {
   <form id="vt-login" autocomplete="on">
     <span class="t">● Private · Vignesh Vasudevan Nair</span>
     <h1>The<br><em>Shortlist</em></h1>
+    <p class="h" id="vt-hint" hidden>Search your Gmail for “Shortlist recovery code” and type the code here.</p>
     <input type="password" id="vt-pw" placeholder="Password" autocomplete="current-password" required aria-label="Password">
     <label class="r"><input type="checkbox" id="vt-keep"> Keep me signed in on this device</label>
     <button type="submit" id="vt-go">Unlock →</button>
     <p class="e" id="vt-err" hidden>That password didn’t unlock it.</p>
+    <button type="button" class="lnk" id="vt-forgot">Forgot password?</button>
   </form>
 </div>
+<p class="vt-note" id="vt-note" hidden>Opened with your recovery code. To set a new password, tell Claude “change my Shortlist password to …”.</p>
 <button type="button" class="vt-out" id="vt-signout" hidden>Sign out</button>
 <style>
 .vt { --bk:#070708; --gy:#141417; --gy2:#0e0e11; --wh:#F5F5F0; --mut:rgba(245,245,240,.66); --dim:rgba(245,245,240,.4); --line:rgba(255,255,255,.08);
@@ -754,14 +767,27 @@ window.dash = (() => {
   const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   const read = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const open = async (raw) => { await dash.unlock(raw); lock.hidden = true; out.hidden = false; };
+  const pw = document.getElementById('vt-pw'), hint = document.getElementById('vt-hint'), forgot = document.getElementById('vt-forgot');
+  let recovery = false;
+  forgot.addEventListener('click', () => {
+    recovery = !recovery; err.hidden = true; hint.hidden = !recovery; pw.value = '';
+    pw.type = recovery ? 'text' : 'password';
+    pw.placeholder = recovery ? 'XXXX-XXXX-XXXX-XXXX' : 'Password';
+    pw.autocomplete = recovery ? 'off' : 'current-password';
+    pw.setAttribute('aria-label', recovery ? 'Recovery code' : 'Password');
+    err.textContent = recovery ? 'That code didn’t unlock it.' : 'That password didn’t unlock it.';
+    forgot.textContent = recovery ? 'Use my password instead' : 'Forgot password?';
+    pw.focus();
+  });
   const saved = read('shortlist-key');
   if (saved) open(unb64(saved)).catch(() => store('shortlist-key', null));
   document.getElementById('vt-login').addEventListener('submit', async (e) => {
     e.preventDefault(); err.hidden = true; go.disabled = true;
     try {
-      const raw = await dash.login(document.getElementById('vt-pw').value);
+      const raw = await dash.login(pw.value, recovery);
       if (document.getElementById('vt-keep').checked) store('shortlist-key', b64(raw));
       await open(raw);
+      document.getElementById('vt-note').hidden = !recovery;
     } catch (x) { err.hidden = false; } finally { go.disabled = false; }
   });
   out.addEventListener('click', () => { store('shortlist-key', null); location.reload(); });
