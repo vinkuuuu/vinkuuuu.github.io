@@ -86,7 +86,10 @@
   /* IMPACT METRICS */
   .metrics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
   .metrics-block { background: var(--black); border: 1px solid var(--border); padding: 36px; }
-  .metrics-block-title { font-family: "Space Mono", monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--lime); text-transform: uppercase; margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .metrics-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 20px; margin-bottom: 26px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .mh-co { font-family: "Bebas Neue", sans-serif; font-size: 30px; letter-spacing: 0.02em; color: var(--white); line-height: 1; }
+  .mh-role { font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 6px; line-height: 1.5; }
+  .mh-when { font-family: "Space Mono", monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--lime); text-transform: uppercase; white-space: nowrap; }
   .metrics-list { display: flex; flex-direction: column; gap: 20px; }
   .metric-item { display: flex; align-items: center; gap: 20px; }
   .metric-num { font-family: "Bebas Neue", sans-serif; font-size: 42px; color: var(--white); line-height: 1; min-width: 110px; }
@@ -202,10 +205,10 @@
   <div class="hero-left">
     <div class="tag">Accountant · Audit Professional · Palakkad, India · Open to relocation</div>
     <h1 class="hero-name">VIGNESH<br><span class="accent">VASUDEVAN</span><br>NAIR</h1>
-    <p class="hero-title">Ferrari Group · Ernst & Young · Amazon · 3 Countries · M.S. UC Riverside</p>
+    <p class="hero-title">Ferrari Group · Big 4 · Amazon · 3 Countries · M.S. UC Riverside</p>
     <p class="hero-pitch">
       Big 4-trained audit professional with 4+ years across the US, India, and UAE.
-      From NAV pack testing at Ernst & Young to uncovering systemic billing defects at Amazon —
+      From NAV pack testing in Big 4 audit to uncovering systemic billing defects at Amazon —
       I bring precision, accountability, and measurable results to every engagement.
     </p>
     <div class="hero-cta">
@@ -223,7 +226,7 @@
     <div class="hero-float-card">
       <div class="fc-label">Experience</div>
       <div class="fc-val">4+ YRS</div>
-      <div class="fc-sub">Ferrari · EY · Amazon · CCC</div>
+      <div class="fc-sub">Ferrari · Big 4 · Amazon · CCC</div>
     </div>
     <div class="hero-float-card2">
       <div class="fc-label">Countries</div>
@@ -236,7 +239,7 @@
 <div class="marquee-wrap">
   <div class="marquee-track">
     <span class="marquee-item">External Audit</span>
-    <span class="marquee-item">Ernst & Young</span>
+    <span class="marquee-item">Accounts Payable</span>
     <span class="marquee-item">US GAAP</span>
     <span class="marquee-item">NAV Pack Review</span>
     <span class="marquee-item">VAT Compliance</span>
@@ -246,7 +249,7 @@
     <span class="marquee-item">Oracle EBS</span>
     <span class="marquee-item">Power BI</span>
     <span class="marquee-item">External Audit</span>
-    <span class="marquee-item">Ernst & Young</span>
+    <span class="marquee-item">Accounts Payable</span>
     <span class="marquee-item">US GAAP</span>
     <span class="marquee-item">NAV Pack Review</span>
     <span class="marquee-item">VAT Compliance</span>
@@ -277,9 +280,9 @@
       <div class="stat-accent"></div>
     </div>
     <div class="stat-card">
-      <div class="stat-num">EY</div>
-      <div class="stat-label">Big 4 — Audit Staff II</div>
-      <div class="stat-note">Minneapolis, USA</div>
+      <div class="stat-num">Big 4</div>
+      <div class="stat-label">Audit Staff, Assurance</div>
+      <div class="stat-note">Wealth &amp; Asset Management</div>
       <div class="stat-accent" style="background:linear-gradient(90deg,var(--lime),transparent)"></div>
     </div>
     <div class="stat-card">
@@ -289,7 +292,7 @@
       <div class="stat-accent" style="background:linear-gradient(90deg,var(--purple),transparent)"></div>
     </div>
     <div class="stat-card">
-      <div class="stat-num">#1</div>
+      <div class="stat-num">1st</div>
       <div class="stat-label">CalCPA Inland Empire Scholar</div>
       <div class="stat-note">First international recipient</div>
       <div class="stat-accent" style="background:linear-gradient(90deg,#f59e0b,transparent)"></div>
@@ -298,7 +301,7 @@
 
   <div class="metrics-row">
     <div class="metrics-block">
-      <div class="metrics-block-title">Ferrari Group — Accounts Payable Officer · 2026</div>
+      <div class="metrics-head"><div><div class="mh-co">Ferrari Group</div><div class="mh-role">Accounts Payable Officer</div></div><div class="mh-when">2026</div></div>
       <div class="metrics-list">
         <div class="metric-item">
           <div class="metric-num">350</div>
@@ -306,62 +309,62 @@
         </div>
         <div class="metric-item">
           <div class="metric-num">2<span>wks</span></div>
-          <div class="metric-desc">To automate the bank allocation work paper, with an ageing view of accounts 30+ days overdue.</div>
+          <div class="metric-desc">To automate the bank allocation work paper, adding an ageing view of accounts 30+ days overdue.</div>
         </div>
         <div class="metric-item">
           <div class="metric-num">7</div>
-          <div class="metric-desc">Luxury and watch houses whose accounts were kept current, from Rolex to Swatch Group.</div>
+          <div class="metric-desc">Luxury and watch houses whose accounts were kept current, from Rolex to Hermès.</div>
         </div>
       </div>
     </div>
     <div class="metrics-block">
-      <div class="metrics-block-title">EY — Audit Staff, Wealth &amp; Asset Management · 2024–2025</div>
+      <div class="metrics-head"><div><div class="mh-co">Big 4</div><div class="mh-role">Audit Staff, Assurance · Wealth &amp; Asset Management</div></div><div class="mh-when">2024–2025</div></div>
       <div class="metrics-list">
         <div class="metric-item">
           <div class="metric-num">5<span>+</span></div>
-          <div class="metric-desc">US GAAP engagements for funds, asset managers and investment banks.</div>
+          <div class="metric-desc">US GAAP audit engagements for funds, asset managers and investment banks.</div>
         </div>
         <div class="metric-item">
-          <div class="metric-num">NAV</div>
-          <div class="metric-desc">Packs and full financial statement tie-outs tested against materiality thresholds.</div>
+          <div class="metric-num">4</div>
+          <div class="metric-desc">Fund types audited: hedge, private equity, mutual and digital asset funds.</div>
         </div>
         <div class="metric-item">
-          <div class="metric-num">Top</div>
+          <div class="metric-num">Q1</div>
           <div class="metric-desc">Rated “Most Exceptional” in the first-quarter performance review.</div>
         </div>
       </div>
     </div>
     <div class="metrics-block">
-      <div class="metrics-block-title">Amazon — Financial Operations Analyst · AR · 2020–2022</div>
+      <div class="metrics-head"><div><div class="mh-co">Amazon</div><div class="mh-role">Financial Operations Analyst · Accounts Receivable</div></div><div class="mh-when">2020–2022</div></div>
       <div class="metrics-list">
         <div class="metric-item">
           <div class="metric-num">70<span>%</span></div>
-          <div class="metric-desc">Reduction in re-bill backlog after developing and rolling out the team-wide SOP — surpassing the target by 55%.</div>
+          <div class="metric-desc">Cut in the re-bill backlog from a team-wide SOP I wrote and rolled out, beating the target by 55%.</div>
         </div>
         <div class="metric-item">
-          <div class="metric-num">44<span>%</span></div>
-          <div class="metric-desc">Of vendor invoices found to carry faulty VAT details — a critical Oracle EBS defect that triggered a system-wide correction.</div>
+          <div class="metric-num">300<span>+</span></div>
+          <div class="metric-desc">Seller and client billing disputes resolved a month across North America, MENA and the UK.</div>
         </div>
         <div class="metric-item">
           <div class="metric-num">12<span>mo+</span></div>
-          <div class="metric-desc">Ageing disputes resolved, closing stalled cases other analysts could not progress.</div>
+          <div class="metric-desc">Ageing disputes cleared by investigating stalled cases through to resolution.</div>
         </div>
       </div>
     </div>
     <div class="metrics-block">
-      <div class="metrics-block-title">CCC Abu Dhabi — Accounting Clerk · 2018–2019</div>
+      <div class="metrics-head"><div><div class="mh-co">CCC</div><div class="mh-role">Accounting Clerk · Consolidated Contractors Company</div></div><div class="mh-when">2018–2019</div></div>
       <div class="metrics-list">
         <div class="metric-item">
-          <div class="metric-num">100<span>%</span></div>
-          <div class="metric-desc">On-time VAT return submissions maintained throughout tenure with zero compliance penalties recorded.</div>
+          <div class="metric-num">1,500</div>
+          <div class="metric-desc">Supplier invoices processed a month for about 100 suppliers.</div>
         </div>
         <div class="metric-item">
-          <div class="metric-num">Zero</div>
-          <div class="metric-desc">Audit findings raised against AP documentation — all schedules and supporting records were audit-ready at year-end.</div>
+          <div class="metric-num">$350<span>M</span></div>
+          <div class="metric-desc">Zahia City Center project, with its accounts payable run end to end from the Abu Dhabi head office.</div>
         </div>
         <div class="metric-item">
-          <div class="metric-num">Daily</div>
-          <div class="metric-desc">AP updates, account reconciliations, and petty cash management maintained to keep accurate real-time cash flow records.</div>
+          <div class="metric-num">0</div>
+          <div class="metric-desc">Audit findings at year-end, with every AP document audit-ready.</div>
         </div>
       </div>
     </div>
@@ -378,13 +381,13 @@
       <div class="why-card-num">01</div>
       <div class="why-card-icon">🏦</div>
       <h3>Big 4 Standard, Every Time</h3>
-      <p>Trained at Ernst & Young auditing high-profile wealth and asset management clients. I apply materiality thresholds, NAV pack testing, and full financial statement tie-outs with the discipline that defines Big 4 work.</p>
+      <p>Big 4-trained, auditing high-profile wealth and asset management clients. I apply materiality thresholds, NAV pack testing, and full financial statement tie-outs with the discipline that defines Big 4 work.</p>
     </div>
     <div class="why-card">
       <div class="why-card-num">02</div>
       <div class="why-card-icon">📈</div>
       <h3>Engagement Ownership</h3>
-      <p>Took full ownership of audit engagements during EY's busy season — coordinating fieldwork, reviewing workpapers, and acting as the primary client contact across multiple concurrent engagements simultaneously.</p>
+      <p>Took full ownership of audit engagements during Big 4 busy season — coordinating fieldwork, reviewing workpapers, and acting as the primary client contact across multiple concurrent engagements simultaneously.</p>
     </div>
     <div class="why-card">
       <div class="why-card-num">03</div>
@@ -444,7 +447,7 @@
       <div>
         <h3 class="xp-head">Audited the funds and banks behind global capital markets.</h3>
         <ul>
-          <li>Delivered audit work on <b>5+ US GAAP engagements</b> for funds, asset managers and investment banks in EY’s Wealth &amp; Asset Management practice.</li>
+          <li>Delivered audit work on <b>5+ US GAAP engagements</b> for funds, asset managers and investment banks in the Wealth &amp; Asset Management practice.</li>
           <li>Kept <b>multiple concurrent busy-season engagements on track</b> as the primary client contact by coordinating fieldwork and reviewing work papers.</li>
           <li>Gave the team <b>one view of significant prior-year changes</b> for the financial statement notes by building a roll-forward work paper that tied each change to the trial balance.</li>
           <li>Tested <b>NAV packs and full financial statement tie-outs against materiality thresholds</b> across hedge fund, private equity, mutual fund and digital asset engagements.</li>
@@ -505,7 +508,7 @@
     <div class="exp-cell">
       <div class="exp-cell-icon">📋</div>
       <h4>External Audit</h4>
-      <p>Materiality testing, NAV pack review, P&L analysis, and full financial statement tie-outs — applied to wealth and asset management clients at EY standard.</p>
+      <p>Materiality testing, NAV pack review, P&L analysis, and full financial statement tie-outs — applied to wealth and asset management clients to Big 4 standard.</p>
     </div>
     <div class="exp-cell">
       <div class="exp-cell-icon">⚖️</div>
