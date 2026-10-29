@@ -285,6 +285,10 @@ window.dash = (() => {
 .vt-tbl th[aria-sort="ascending"] button, .vt-tbl th[aria-sort="descending"] button { color: var(--lime); }
 .vt-tbl td { padding: 13px 14px; border-bottom: 1px solid rgba(255,255,255,.05); color: var(--mut); vertical-align: top; }
 .vt-tbl td.c { color: var(--wh); font-weight: 500; }
+#vt-open-t td { vertical-align: middle; }
+.vt-tbl td.vt-acts { white-space: nowrap; }
+.vt-tbl td.vt-acts .vt-btn + .vt-btn { margin-left: 8px; }
+.vt-tbl th button:disabled { cursor: default; }
 .vt-tbl td.n { font-family: var(--fd); font-size: 20px; color: var(--wh); }
 .vt-tbl tr:hover td { background: rgba(200,255,0,.03); }
 
@@ -373,6 +377,22 @@ window.dash = (() => {
     <div class="vt-cards" id="vt-cards"></div>
   </section>
 
+  <section class="vt-wrap vt-sec" id="vt-open" aria-labelledby="vt-open-h">
+    <div class="vt-head vt-rv">
+      <div>
+        <p class="vt-eye">// Still open · not applied</p>
+        <h2 class="vt-h2" id="vt-open-h">Worth a<br><em>second look.</em></h2>
+        <p class="vt-p">Earlier picks that still pass every rule, score 80+ on a recruiter’s read and were still open at the last check. Apply before they close.</p>
+      </div>
+    </div>
+    <div class="vt-tbl vt-rv">
+      <table id="vt-open-t" data-source="still_open" data-row-key="id">
+        <thead><tr><th><button type="button" disabled>Picked</button></th><th><button type="button" disabled>Company</button></th><th><button type="button" disabled>Role</button></th><th><button type="button" disabled>City</button></th><th><button type="button" disabled>Match</button></th><th><button type="button" disabled>Open on</button></th><th><button type="button" disabled>Apply</button></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="vt-wrap vt-sec" id="vt-filter" aria-labelledby="vt-filter-h">
     <div class="vt-split">
       <div class="vt-rv">
@@ -459,6 +479,17 @@ window.dash = (() => {
     fn: (jobs) => {
       const last = jobs.reduce((m, j) => (j.sent_at > m ? j.sent_at : m), '');
       return jobs.filter((j) => j.sent_at === last && j.status !== 'Skipped').sort((a, b) => Number(a.rank) - Number(b.rank));
+    },
+  });
+
+  dash.calc('still_open', {
+    inputs: ['jobs', 'latest'],
+    title: 'Still open, not applied',
+    description: 'Earlier picks scoring 80+ that pass every current rule, were still open at the last check and have not been applied to.',
+    fn: (jobs, latest) => {
+      const now = new Set(latest.map((j) => j.id));
+      return jobs.filter((j) => j.status === 'Sent' && j.open === true && Number(j.score) >= 80 && !now.has(j.id))
+        .sort((a, b) => Number(b.score) - Number(a.score));
     },
   });
 
@@ -729,6 +760,29 @@ window.dash = (() => {
     }));
   }
 
+  function drawOpen() {
+    const s = dash.data('still_open');
+    const body = document.querySelector('#vt-open-t tbody');
+    if (s.status === 'error') { fail(body); return; }
+    if (s.status !== 'ok') { body.replaceChildren(); return; }
+    if (!s.data.length) {
+      const tr = el('tr'), td = el('td', null, 'Nothing waiting: every earlier pick is applied to, closed or scored under 80.');
+      td.colSpan = 7; tr.append(td); body.replaceChildren(tr); return;
+    }
+    body.replaceChildren(...s.data.map((j) => {
+      const tr = el('tr'); tr.dataset.key = j.id;
+      tr.append(el('td', null, fmtShort(j.date)), mark(el('td', 'c', j.company), 'still_open', 'company', j.id), mark(el('td', null, j.role), 'still_open', 'role', j.id),
+        el('td', null, j.city), mark(el('td', 'n', String(j.score)), 'still_open', 'score', j.id), mark(el('td', null, fmtShort(j.open_checked)), 'still_open', 'open_checked', j.id));
+      const act = el('td', 'vt-acts');
+      const apply = safeUrl(j.link);
+      if (apply) { const a = el('a', 'vt-btn sm', 'Apply ↗'); a.href = apply; a.target = '_blank'; a.rel = 'noopener'; act.append(a); }
+      const cv = resumeUrl(j);
+      if (cv) { const a = el('a', 'vt-btn sm o', 'Resume PDF ↓'); a.href = cv; a.target = '_blank'; a.rel = 'noopener'; a.title = `Tailored resume for ${j.company}`; act.append(a); }
+      tr.append(act);
+      return tr;
+    }));
+  }
+
   let sortKey = 'date', sortDir = -1;
   function drawTable() {
     const s = dash.data('jobs');
@@ -756,7 +810,7 @@ window.dash = (() => {
   }));
   document.getElementById('vt-q').addEventListener('input', drawTable);
 
-  dash.onData(() => { drawTotals(); drawMarquee(); drawChips(); drawFive(); drawSteps(); drawPipeline(); drawLog(); drawTable(); });
+  dash.onData(() => { drawTotals(); drawMarquee(); drawChips(); drawFive(); drawOpen(); drawSteps(); drawPipeline(); drawLog(); drawTable(); });
 </script>
 
 <script>
