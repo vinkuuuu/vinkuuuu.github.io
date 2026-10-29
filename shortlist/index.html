@@ -477,7 +477,7 @@ window.dash = (() => {
     description: 'Jobs in the most recent shortlist, best first.',
     fn: (jobs) => {
       const last = jobs.reduce((m, j) => (j.sent_at > m ? j.sent_at : m), '');
-      return jobs.filter((j) => j.sent_at === last && !['Skipped', 'Passed', 'Closed'].includes(j.status)).sort((a, b) => Number(a.rank) - Number(b.rank));
+      return jobs.filter((j) => j.sent_at === last && j.status === 'Sent').sort((a, b) => Number(a.rank) - Number(b.rank));
     },
   });
 
@@ -648,6 +648,7 @@ window.dash = (() => {
     if (s.status === 'error') { fail(box); dateMark.textContent = '—'; return; }
     if (s.status !== 'ok') { box.replaceChildren(); dateMark.textContent = '—'; return; }
     dateMark.textContent = s.data.length ? fmtDay(s.data[0].date) : '—';
+    if (!s.data.length) { box.replaceChildren(el('p', 'vt-p', 'Every job on today’s list is applied to or closed: applied ones are in the Pipeline below. The next list arrives at 8 AM.')); firstFive = false; applyFilter(); return; }
     box.replaceChildren(...s.data.map((j, i) => {
       const card = el('article', 'vt-card vt-rv'); card.dataset.fam = j.family || 'Finance';
       if (firstFive) card.style.transitionDelay = `${i * 90}ms`;
