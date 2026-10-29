@@ -273,14 +273,6 @@ window.dash = (() => {
 .vt-cv { display: inline-block; margin-top: 8px; font-family: var(--fm); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--lime); }
 .vt-empty { border: 1px dashed rgba(255,255,255,.14); border-radius: 10px; padding: 18px 12px; text-align: center; font-family: var(--fm); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
 
-/* journey */
-.vt-log { list-style: none; margin: 40px 0 0; padding: 0 0 0 28px; position: relative; display: grid; gap: 30px; }
-.vt-log::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px; background: linear-gradient(180deg, var(--lime), var(--pur) 60%, transparent); }
-.vt-log li { position: relative; }
-.vt-log li::before { content: ""; position: absolute; left: -28px; top: 7px; width: 14px; height: 14px; border-radius: 50%; background: var(--bk); border: 2px solid var(--lime); box-shadow: 0 0 14px rgba(200,255,0,.55); }
-.vt-log time { font-family: var(--fm); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--lime); }
-.vt-log h3 { font-family: var(--fd); font-weight: 400; font-size: clamp(24px, 2.6vw, 32px); line-height: 1.05; margin: 6px 0 6px; letter-spacing: .01em; }
-.vt-log p { margin: 0; color: var(--mut); font-size: 14.5px; max-width: 70ch; }
 
 /* archive */
 .vt-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
@@ -427,12 +419,6 @@ window.dash = (() => {
     <div class="vt-cols vt-rv" id="vt-cols"></div>
   </section>
 
-  <section class="vt-wrap vt-sec" aria-labelledby="vt-log-h">
-    <p class="vt-eye vt-rv">// The story so far</p>
-    <h2 class="vt-h2 vt-rv" id="vt-log-h">The <em>journey</em></h2>
-    <ol class="vt-log" id="vt-log"></ol>
-  </section>
-
   <section class="vt-wrap vt-sec" aria-labelledby="vt-arc-h">
     <div class="vt-tools vt-rv">
       <div><p class="vt-eye">// Archive</p><h2 class="vt-h2" id="vt-arc-h">Every job <em>shortlisted</em></h2></div>
@@ -486,7 +472,7 @@ window.dash = (() => {
     description: 'Jobs in the most recent shortlist, best first.',
     fn: (jobs) => {
       const last = jobs.reduce((m, j) => (j.sent_at > m ? j.sent_at : m), '');
-      return jobs.filter((j) => j.sent_at === last && !['Skipped', 'Passed'].includes(j.status)).sort((a, b) => Number(a.rank) - Number(b.rank));
+      return jobs.filter((j) => j.sent_at === last && !['Skipped', 'Passed', 'Closed'].includes(j.status)).sort((a, b) => Number(a.rank) - Number(b.rank));
     },
   });
 
@@ -754,21 +740,6 @@ window.dash = (() => {
     }));
   }
 
-  function drawLog() {
-    const s = dash.data('events');
-    const box = document.getElementById('vt-log');
-    if (s.status === 'error') { fail(box); return; }
-    if (s.status !== 'ok') { box.replaceChildren(); return; }
-    const rows = [...s.data].sort((a, b) => (a.date === b.date ? (Number(String(a.id).slice(1)) < Number(String(b.id).slice(1)) ? 1 : -1) : a.date < b.date ? 1 : -1));
-    box.replaceChildren(...rows.map((e) => {
-      const li = el('li', 'vt-rv');
-      const t = el('time', null, `${fmtShort(e.date)} · ${e.type}`); t.dateTime = e.date; li.append(t);
-      li.append(mark(el('h3', null, e.title), 'events', 'title', e.id), mark(el('p', null, e.detail), 'events', 'detail', e.id));
-      watch(li);
-      return li;
-    }));
-  }
-
   function drawOpen() {
     const s = dash.data('still_open');
     const body = document.querySelector('#vt-open-t tbody');
@@ -820,7 +791,7 @@ window.dash = (() => {
   }));
   document.getElementById('vt-q').addEventListener('input', drawTable);
 
-  dash.onData(() => { drawTotals(); drawMarquee(); drawChips(); drawFive(); drawOpen(); drawSteps(); drawPipeline(); drawLog(); drawTable(); });
+  dash.onData(() => { drawTotals(); drawMarquee(); drawChips(); drawFive(); drawOpen(); drawSteps(); drawPipeline(); drawTable(); });
 </script>
 
 <style>
