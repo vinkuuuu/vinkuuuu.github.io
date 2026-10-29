@@ -460,7 +460,7 @@ window.dash = (() => {
     title: 'Totals',
     description: 'Postings screened and reposts caught across all daily searches, and shortlisted jobs counted by status.',
     fn: (daily, jobs) => {
-      const live = jobs.filter((j) => j.status !== 'Skipped');
+      const live = jobs.filter((j) => !['Skipped', 'Reserve', 'Unused'].includes(j.status));
       return [{
         screened: daily.reduce((s, d) => s + Number(d.scanned || 0), 0),
         reposts: daily.reduce((s, d) => s + Number(d.reposts_removed || 0), 0),
@@ -477,7 +477,7 @@ window.dash = (() => {
     description: 'Jobs in the most recent shortlist, best first.',
     fn: (jobs) => {
       const last = jobs.reduce((m, j) => (j.sent_at > m ? j.sent_at : m), '');
-      return jobs.filter((j) => j.sent_at === last && j.status === 'Sent').sort((a, b) => Number(a.rank) - Number(b.rank));
+      return jobs.filter((j) => j.sent_at === last && (j.status === 'Sent' || j.status === 'Reserve')).sort((a, b) => Number(a.rank) - Number(b.rank)).slice(0, 5);
     },
   });
 
@@ -652,7 +652,7 @@ window.dash = (() => {
     box.replaceChildren(...s.data.map((j, i) => {
       const card = el('article', 'vt-card vt-rv'); card.dataset.fam = j.family || 'Finance';
       if (firstFive) card.style.transitionDelay = `${i * 90}ms`;
-      card.append(mark(el('span', 'vt-num', String(j.rank).padStart(2, '0')), 'latest', 'rank', j.id));
+      card.append(el('span', 'vt-num', String(i + 1).padStart(2, '0')));
       const pills = el('div', 'vt-pills');
       pills.append(mark(el('span', 'vt-pill ' + famClass(j.family), j.family || 'Finance'), 'latest', 'family', j.id), mark(el('span', 'vt-pill', j.city), 'latest', 'city', j.id));
       card.append(pills);
@@ -680,7 +680,7 @@ window.dash = (() => {
       if (cv) { const a = el('a', 'vt-btn sm o', 'Resume PDF ↓'); a.href = cv; a.target = '_blank'; a.rel = 'noopener'; a.title = `Tailored resume for ${j.company}`; foot.append(a); }
       const li = safeUrl(j.linkedin);
       if (li) { const a = el('a', 'vt-ico'); a.href = li; a.target = '_blank'; a.rel = 'noopener'; a.title = 'LinkedIn post and hiring team'; a.setAttribute('aria-label', `${j.company} on LinkedIn`); a.append(linkedin()); foot.append(a); }
-      foot.append(mark(el('span', 'vt-st' + (APPLIED.includes(j.status) ? ' ok' : ''), j.status), 'latest', 'status', j.id));
+      foot.append(el('span', 'vt-st' + (APPLIED.includes(j.status) ? ' ok' : ''), j.status === 'Reserve' ? 'Backup pick' : j.status));
       if (window.vtApplied) foot.append(window.vtApplied(j));
       if (window.vtReject) foot.append(window.vtReject(j));
       card.append(foot);
@@ -789,6 +789,7 @@ window.dash = (() => {
     if (s.status !== 'ok') { body.replaceChildren(); return; }
     const q = (document.getElementById('vt-q').value || '').trim().toLowerCase();
     const rows = s.data
+      .filter((j) => !['Reserve', 'Unused'].includes(j.status))
       .filter((j) => !q || [j.company, j.role, j.city, j.status, j.freshness].join(' ').toLowerCase().includes(q))
       .sort((a, b) => {
         const x = sortKey === 'score' ? Number(a.score) : String(a[sortKey] || '') + String(a.sent_at || '');
@@ -840,7 +841,7 @@ window.dash = (() => {
   // Status changes made on this page (I applied, Not for me, Interview, Rejected): shown at once and kept on this
   // device, and a one-line email to himself tells the morning run, which makes them permanent on both trackers.
   const REASONS = ['Closed or filled', 'Not a fit', 'Avoid this company', 'Other'];
-  const RANK = { Sent: 0, Applied: 1, Replied: 2, Interview: 3, Offer: 4, Rejected: 5, Passed: 5, Closed: 5 };
+  const RANK = { Sent: 0, Reserve: 0, Applied: 1, Replied: 2, Interview: 3, Offer: 4, Rejected: 5, Passed: 5, Closed: 5 };
   const KEEP = ['status', 'applied_on', 'followup_due', 'applied_source', 'pass_reason', 'rejected_on'];
   const local = () => {
     let r = {};
@@ -851,7 +852,11 @@ window.dash = (() => {
   const save = (r) => { store('shortlist-status', JSON.stringify(r)); store('shortlist-rejects', null); };
   const applyLocal = () => {
     const r = local();
-    (dash.data('jobs').data || []).forEach((j) => { const x = r[j.id]; if (x && (RANK[j.status] ?? 0) < (RANK[x.status] ?? 0)) dash.setStatus(j.id, x.status, x.extra); });
+    const jobs = dash.data('jobs').data || [];
+    jobs.forEach((j) => { const x = r[j.id]; if (x && (RANK[j.status] ?? 0) < (RANK[x.status] ?? 0)) dash.setStatus(j.id, x.status, x.extra); });
+    // "Avoid this company" also hides that company's other open picks and backups here
+    const avoid = new Set(jobs.filter((j) => r[j.id] && r[j.id].extra && r[j.id].extra.pass_reason === 'Avoid this company').map((j) => j.company));
+    jobs.forEach((j) => { if (avoid.has(j.company) && (j.status === 'Sent' || j.status === 'Reserve')) dash.setStatus(j.id, 'Passed', { pass_reason: 'Avoid this company' }); });
   };
   const today = () => new Date().toLocaleDateString('en-CA');
   const plus7 = () => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toLocaleDateString('en-CA'); };
@@ -876,17 +881,17 @@ Sent from The Shortlist. The morning run updates this job on both trackers.`;
   const btn = (label, cls, title, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = label; b.title = title; b.addEventListener('click', fn); return b; };
   window.vtApplied = (j) => {
     const box = document.createElement('span'); box.className = 'vt-rej';
-    if (j.status !== 'Sent') return box;
+    if (j.status !== 'Sent' && j.status !== 'Reserve') return box;
     box.append(btn('I applied ✓', 'vt-ok-b', `Move ${j.company} to the pipeline`, () =>
       change(j, 'Applied', { applied_on: today(), followup_due: plus7(), applied_source: 'Marked applied on the Shortlist' }, 'applied', `Applied: ${j.company}. Follow up in 7 days.`)));
     return box;
   };
   window.vtReject = (j) => {
     const box = document.createElement('span'); box.className = 'vt-rej';
-    if (j.status !== 'Sent') return box;
+    if (j.status !== 'Sent' && j.status !== 'Reserve') return box;
     const b = btn('Not for me ✕', 'vt-rej-b', `Reject ${j.company}: hide it here and tell tomorrow's run`, () => {
       const pick = document.createElement('span'); pick.className = 'vt-rej-pick'; pick.setAttribute('role', 'group'); pick.setAttribute('aria-label', 'Why not?');
-      REASONS.forEach((reason) => pick.append(btn(reason, '', reason, () => change(j, 'Passed', { pass_reason: reason }, 'reject', `Not for me: ${j.company}.`))));
+      REASONS.forEach((reason) => pick.append(btn(reason, '', reason, () => { change(j, 'Passed', { pass_reason: reason }, 'reject', `Not for me: ${j.company}. The next backup pick takes its place.`); if (reason === 'Avoid this company') applyLocal(); })));
       const x = btn('Cancel', 'x', 'Keep this job', () => box.replaceChildren(b)); pick.append(x);
       box.replaceChildren(pick);
     });
