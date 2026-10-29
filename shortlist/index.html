@@ -59,7 +59,15 @@ window.dash = (() => {
     key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
     const all = await Promise.all(files.map((f) => openFile(`data/${f}.json.enc`)));
     files.forEach((f, i) => { src[f] = JSON.parse(new TextDecoder().decode(all[i])); });
+    try { window.vtOwner = JSON.parse(new TextDecoder().decode(await openFile('data/me.json.enc'))); } catch (e) { window.vtOwner = null; }
     status = 'ok';
+    cbs.forEach((f) => f());
+  };
+  // A rejection made on this page: change the row in memory and redraw (the morning run makes it permanent).
+  const setStatus = (id, st, reason) => {
+    const j = (src.jobs || []).find((r) => r.id === id);
+    if (!j) return;
+    j.status = st; if (reason) j.pass_reason = reason; else delete j.pass_reason;
     cbs.forEach((f) => f());
   };
   // The data key is wrapped twice: once by the password, once by the recovery code kept in the owner's email.
@@ -72,7 +80,7 @@ window.dash = (() => {
       base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
     return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(s.iv) }, kek, b64(s.wrapped)));
   };
-  return { calc: (id, o) => { calcs[id] = o; }, data: get, onData: (f) => { cbs.push(f); f(); }, login, unlock, openFile };
+  return { calc: (id, o) => { calcs[id] = o; }, data: get, onData: (f) => { cbs.push(f); f(); }, login, unlock, openFile, setStatus };
 })();
 </script>
 </head>
@@ -478,7 +486,7 @@ window.dash = (() => {
     description: 'Jobs in the most recent shortlist, best first.',
     fn: (jobs) => {
       const last = jobs.reduce((m, j) => (j.sent_at > m ? j.sent_at : m), '');
-      return jobs.filter((j) => j.sent_at === last && j.status !== 'Skipped').sort((a, b) => Number(a.rank) - Number(b.rank));
+      return jobs.filter((j) => j.sent_at === last && !['Skipped', 'Passed'].includes(j.status)).sort((a, b) => Number(a.rank) - Number(b.rank));
     },
   });
 
@@ -681,6 +689,7 @@ window.dash = (() => {
       const li = safeUrl(j.linkedin);
       if (li) { const a = el('a', 'vt-ico'); a.href = li; a.target = '_blank'; a.rel = 'noopener'; a.title = 'LinkedIn post and hiring team'; a.setAttribute('aria-label', `${j.company} on LinkedIn`); a.append(linkedin()); foot.append(a); }
       foot.append(mark(el('span', 'vt-st' + (APPLIED.includes(j.status) ? ' ok' : ''), j.status), 'latest', 'status', j.id));
+      if (window.vtReject) foot.append(window.vtReject(j));
       card.append(foot);
       tilt(card);
       watch(card);
@@ -778,6 +787,7 @@ window.dash = (() => {
       if (apply) { const a = el('a', 'vt-btn sm', 'Apply ↗'); a.href = apply; a.target = '_blank'; a.rel = 'noopener'; act.append(a); }
       const cv = resumeUrl(j);
       if (cv) { const a = el('a', 'vt-btn sm o', 'Resume PDF ↓'); a.href = cv; a.target = '_blank'; a.rel = 'noopener'; a.title = `Tailored resume for ${j.company}`; act.append(a); }
+      if (window.vtReject) act.append(window.vtReject(j));
       tr.append(act);
       return tr;
     }));
@@ -813,6 +823,20 @@ window.dash = (() => {
   dash.onData(() => { drawTotals(); drawMarquee(); drawChips(); drawFive(); drawOpen(); drawSteps(); drawPipeline(); drawLog(); drawTable(); });
 </script>
 
+<style>
+.vt-rej { display: inline-flex; }
+.vt-rej button { font: 700 10.5px 'Space Mono', monospace; letter-spacing: .12em; text-transform: uppercase; padding: 9px 12px; border-radius: 3px;
+  border: 1px solid rgba(255,255,255,.2); background: transparent; color: rgba(245,245,240,.7); cursor: pointer; }
+.vt-rej button:hover { border-color: #FF5A5A; color: #FF5A5A; }
+.vt-rej-pick { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.vt-rej-pick button.x { border-color: transparent; text-decoration: underline; }
+.vt-toast { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); bottom: 64px; z-index: 45;
+  max-width: 520px; margin: 0 auto; display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 3px;
+  border: 1px solid rgba(255,90,90,.5); background: #0c0c0f; color: #F5F5F0; font: 13.5px/1.5 'DM Sans', system-ui, sans-serif; }
+.vt-toast[hidden] { display: none; }
+.vt-toast button { font: 700 11px 'Space Mono', monospace; letter-spacing: .14em; text-transform: uppercase; padding: 8px 12px; border: 0; border-radius: 3px;
+  background: #C8FF00; color: #070708; cursor: pointer; flex: none; }
+</style>
 <script>
 (() => {
   const lock = document.getElementById('vt-lock'), err = document.getElementById('vt-err'), go = document.getElementById('vt-go');
@@ -820,7 +844,41 @@ window.dash = (() => {
   const b64 = (u8) => btoa(String.fromCharCode(...u8)), unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   const read = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  const open = async (raw) => { await dash.unlock(raw); lock.hidden = true; out.hidden = false; };
+  // "Not for me": saved on this device at once, and a one-line email to himself tells the morning run.
+  const REASONS = ['Closed or filled', 'Not a fit', 'Avoid this company', 'Other'];
+  const rejects = () => { try { return JSON.parse(read('shortlist-rejects') || '{}'); } catch (e) { return {}; } };
+  const applyRejects = () => { const r = rejects(); (dash.data('jobs').data || []).forEach((j) => { if (r[j.id] && j.status === 'Sent') dash.setStatus(j.id, 'Passed', r[j.id].reason); }); };
+  const toast = document.createElement('div'); toast.className = 'vt-toast'; toast.hidden = true; document.body.append(toast);
+  let toastT = 0;
+  const reject = (j, reason) => {
+    const r = rejects(); r[j.id] = { reason, at: new Date().toISOString() }; store('shortlist-rejects', JSON.stringify(r));
+    dash.setStatus(j.id, 'Passed', reason);
+    const t = document.createElement('span'); t.textContent = `Not for me: ${j.company}. Send the email that opened so tomorrow's run learns from it.`;
+    const undo = document.createElement('button'); undo.type = 'button'; undo.textContent = 'Undo';
+    undo.addEventListener('click', () => { const x = rejects(); delete x[j.id]; store('shortlist-rejects', JSON.stringify(x)); dash.setStatus(j.id, 'Sent'); toast.hidden = true; });
+    toast.replaceChildren(t, undo); toast.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { toast.hidden = true; }, 12000);
+    const to = (window.vtOwner && window.vtOwner.email) || '';
+    const body = `Reason: ${reason}
+Job: ${j.link || ''}
+
+Sent from The Shortlist. The morning run marks this job as not for me on both trackers${reason === 'Avoid this company' ? ' and skips this company from now on' : ''}.`;
+    location.href = `mailto:${to}?subject=${encodeURIComponent(`Shortlist reject: ${j.company} – ${j.role} (${j.id})`)}&body=${encodeURIComponent(body)}`;
+  };
+  window.vtReject = (j) => {
+    const box = document.createElement('span'); box.className = 'vt-rej';
+    if (j.status !== 'Sent') return box;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'vt-rej-b'; b.textContent = 'Not for me ✕';
+    b.title = `Reject ${j.company}: hide it here and tell tomorrow's run`;
+    b.addEventListener('click', () => {
+      const pick = document.createElement('span'); pick.className = 'vt-rej-pick'; pick.setAttribute('role', 'group'); pick.setAttribute('aria-label', 'Why not?');
+      REASONS.forEach((reason) => { const c = document.createElement('button'); c.type = 'button'; c.textContent = reason; c.addEventListener('click', () => reject(j, reason)); pick.append(c); });
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = 'Cancel'; x.addEventListener('click', () => box.replaceChildren(b)); pick.append(x);
+      box.replaceChildren(pick);
+    });
+    box.append(b);
+    return box;
+  };
+  const open = async (raw) => { await dash.unlock(raw); applyRejects(); lock.hidden = true; out.hidden = false; };
   const pw = document.getElementById('vt-pw'), hint = document.getElementById('vt-hint'), forgot = document.getElementById('vt-forgot');
   let recovery = false;
   forgot.addEventListener('click', () => {
