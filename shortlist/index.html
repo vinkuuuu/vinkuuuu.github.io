@@ -64,10 +64,10 @@ window.dash = (() => {
     cbs.forEach((f) => f());
   };
   // A rejection made on this page: change the row in memory and redraw (the morning run makes it permanent).
-  const setStatus = (id, st, reason) => {
+  const setStatus = (id, st, extra) => {
     const j = (src.jobs || []).find((r) => r.id === id);
     if (!j) return;
-    j.status = st; if (reason) j.pass_reason = reason; else delete j.pass_reason;
+    j.status = st; Object.assign(j, extra || {});
     cbs.forEach((f) => f());
   };
   // The data key is wrapped twice: once by the password, once by the recovery code kept in the owner's email.
@@ -263,6 +263,10 @@ window.dash = (() => {
 .vt-col h3 span { color: var(--lime); }
 .vt-app { border-radius: 10px; background: #17171b; border: 1px solid var(--line); padding: 14px; transition: transform .2s, border-color .2s; }
 .vt-app + .vt-app { margin-top: 10px; }
+.vt-rejd { margin-top: 18px; border-radius: 14px; border: 1px solid var(--line); padding: 14px 16px; color: var(--mut); font-size: 14px; }
+.vt-rejd summary { cursor: pointer; font-family: var(--fm); font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.vt-rejd ul { margin: 12px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.vt-rejd b { color: var(--wh); font-weight: 600; }
 .vt-app:hover { transform: translateY(-3px); border-color: rgba(200,255,0,.4); }
 .vt-app .vt-co { margin: 0 0 4px; font-size: 11px; }
 .vt-app p { margin: 0; font-size: 14px; line-height: 1.35; }
@@ -410,13 +414,14 @@ window.dash = (() => {
     <div class="vt-rv">
       <p class="vt-eye">// Pipeline</p>
       <h2 class="vt-h2" id="vt-pipe-h">Applied. Waiting.<br><em>Next: interviews.</em></h2>
-      <p class="vt-p">When a company’s “thank you for applying” email lands, the job moves here by itself. The LinkedIn mark opens the hiring team.</p>
+      <p class="vt-p">A job moves here when the company’s confirmation email lands, or when you tap “I applied” on your site’s Shortlist (for LinkedIn Easy Apply, which sends no email). Rejections leave the pipeline and are listed underneath.</p>
     </div>
     <div class="vt-goal vt-rv">
       <div><small>Interview calls · goal 5 by 26 Dec</small><br><b><span data-source="totals" data-field="interviews">—</span> / 5</b></div>
       <div class="vt-segs" id="vt-segs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     </div>
     <div class="vt-cols vt-rv" id="vt-cols"></div>
+    <details class="vt-rejd vt-rv" id="vt-rejd" hidden><summary>Rejected · <span id="vt-rejn">0</span></summary><ul id="vt-rejl"></ul></details>
   </section>
 
   <section class="vt-wrap vt-sec" aria-labelledby="vt-arc-h">
@@ -675,6 +680,7 @@ window.dash = (() => {
       const li = safeUrl(j.linkedin);
       if (li) { const a = el('a', 'vt-ico'); a.href = li; a.target = '_blank'; a.rel = 'noopener'; a.title = 'LinkedIn post and hiring team'; a.setAttribute('aria-label', `${j.company} on LinkedIn`); a.append(linkedin()); foot.append(a); }
       foot.append(mark(el('span', 'vt-st' + (APPLIED.includes(j.status) ? ' ok' : ''), j.status), 'latest', 'status', j.id));
+      if (window.vtApplied) foot.append(window.vtApplied(j));
       if (window.vtReject) foot.append(window.vtReject(j));
       card.append(foot);
       tilt(card);
@@ -710,7 +716,17 @@ window.dash = (() => {
     const box = document.getElementById('vt-cols');
     if (s.status === 'error') { fail(box); return; }
     if (s.status !== 'ok') { box.replaceChildren(); return; }
-    const cols = [['Applied', ['Applied']], ['Heard back', ['Replied', 'Rejected']], ['Interview', ['Interview']], ['Offer', ['Offer']]];
+    const cols = [['Applied', ['Applied']], ['Heard back', ['Replied']], ['Interview', ['Interview']], ['Offer', ['Offer']]];
+    // Rejections leave the pipeline: a short list under it
+    const rej = s.data.filter((j) => j.status === 'Rejected');
+    document.getElementById('vt-rejd').hidden = !rej.length;
+    document.getElementById('vt-rejn').textContent = String(rej.length);
+    document.getElementById('vt-rejl').replaceChildren(...rej.map((j) => {
+      const li = el('li');
+      li.append(mark(el('b', null, j.company), 'applied', 'company', j.id), document.createTextNode(' · '), mark(el('span', null, j.role), 'applied', 'role', j.id));
+      if (j.rejected_on) li.append(document.createTextNode(` · ${fmtShort(j.rejected_on)}`));
+      return li;
+    }));
     box.replaceChildren(...cols.map(([name, sts]) => {
       const col = el('div', 'vt-col');
       const rows = s.data.filter((j) => sts.includes(j.status));
@@ -722,8 +738,8 @@ window.dash = (() => {
         const d = el('p', 'vt-dates', 'Applied ');
         d.append(mark(el('span', null, fmtShort(j.applied_on)), 'applied', 'applied_on', j.id));
         if (j.followup_due) { d.append(document.createTextNode(' · follow up ')); d.append(mark(el('span', null, fmtShort(j.followup_due)), 'applied', 'followup_due', j.id)); }
-        if (j.status === 'Rejected') d.append(document.createTextNode(' · rejected'));
         c.append(d);
+        if (window.vtPipeActions) c.append(window.vtPipeActions(j));
         const cv = resumeUrl(j);
         if (cv) { const r = el('a', 'vt-cv', 'Resume sent ↓'); r.href = cv; r.target = '_blank'; r.rel = 'noopener'; c.append(r); }
         const href = safeUrl(j.hm_url) || safeUrl(j.hm_search);
@@ -758,6 +774,7 @@ window.dash = (() => {
       if (apply) { const a = el('a', 'vt-btn sm', 'Apply ↗'); a.href = apply; a.target = '_blank'; a.rel = 'noopener'; act.append(a); }
       const cv = resumeUrl(j);
       if (cv) { const a = el('a', 'vt-btn sm o', 'Resume PDF ↓'); a.href = cv; a.target = '_blank'; a.rel = 'noopener'; a.title = `Tailored resume for ${j.company}`; act.append(a); }
+      if (window.vtApplied) act.append(window.vtApplied(j));
       if (window.vtReject) act.append(window.vtReject(j));
       tr.append(act);
       return tr;
@@ -800,6 +817,10 @@ window.dash = (() => {
   border: 1px solid rgba(255,255,255,.2); background: transparent; color: rgba(245,245,240,.7); cursor: pointer; }
 .vt-rej button:hover { border-color: #FF5A5A; color: #FF5A5A; }
 .vt-rej-pick { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.vt-rej button.vt-ok-b { border-color: rgba(200,255,0,.5); color: #C8FF00; }
+.vt-rej button.vt-ok-b:hover { background: #C8FF00; color: #070708; border-color: #C8FF00; }
+.vt-pipe-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.vt-pipe-acts button { padding: 7px 10px; font-size: 10px; }
 .vt-rej-pick button.x { border-color: transparent; text-decoration: underline; }
 .vt-toast { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); bottom: 64px; z-index: 45;
   max-width: 520px; margin: 0 auto; display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 3px;
@@ -815,41 +836,72 @@ window.dash = (() => {
   const b64 = (u8) => btoa(String.fromCharCode(...u8)), unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   const read = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  // "Not for me": saved on this device at once, and a one-line email to himself tells the morning run.
+  // Status changes made on this page (I applied, Not for me, Interview, Rejected): shown at once and kept on this
+  // device, and a one-line email to himself tells the morning run, which makes them permanent on both trackers.
   const REASONS = ['Closed or filled', 'Not a fit', 'Avoid this company', 'Other'];
-  const rejects = () => { try { return JSON.parse(read('shortlist-rejects') || '{}'); } catch (e) { return {}; } };
-  const applyRejects = () => { const r = rejects(); (dash.data('jobs').data || []).forEach((j) => { if (r[j.id] && j.status === 'Sent') dash.setStatus(j.id, 'Passed', r[j.id].reason); }); };
+  const RANK = { Sent: 0, Applied: 1, Replied: 2, Interview: 3, Offer: 4, Rejected: 5, Passed: 5, Closed: 5 };
+  const KEEP = ['status', 'applied_on', 'followup_due', 'applied_source', 'pass_reason', 'rejected_on'];
+  const local = () => {
+    let r = {};
+    try { r = JSON.parse(read('shortlist-status') || '{}'); } catch (e) {}
+    try { const old = JSON.parse(read('shortlist-rejects') || '{}'); Object.keys(old).forEach((id) => { r[id] = r[id] || { status: 'Passed', extra: { pass_reason: old[id].reason } }; }); } catch (e) {}
+    return r;
+  };
+  const save = (r) => { store('shortlist-status', JSON.stringify(r)); store('shortlist-rejects', null); };
+  const applyLocal = () => {
+    const r = local();
+    (dash.data('jobs').data || []).forEach((j) => { const x = r[j.id]; if (x && (RANK[j.status] ?? 0) < (RANK[x.status] ?? 0)) dash.setStatus(j.id, x.status, x.extra); });
+  };
+  const today = () => new Date().toLocaleDateString('en-CA');
+  const plus7 = () => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toLocaleDateString('en-CA'); };
   const toast = document.createElement('div'); toast.className = 'vt-toast'; toast.hidden = true; document.body.append(toast);
   let toastT = 0;
-  const reject = (j, reason) => {
-    const r = rejects(); r[j.id] = { reason, at: new Date().toISOString() }; store('shortlist-rejects', JSON.stringify(r));
-    dash.setStatus(j.id, 'Passed', reason);
-    const t = document.createElement('span'); t.textContent = `Not for me: ${j.company}. Send the email that opened so tomorrow's run learns from it.`;
+  const change = (j, st, extra, kind, note) => {
+    const prev = {}; KEEP.forEach((k) => { prev[k] = j[k] ?? null; });
+    const r = local(); r[j.id] = { status: st, extra, at: new Date().toISOString() }; save(r);
+    dash.setStatus(j.id, st, extra);
+    const t = document.createElement('span'); t.textContent = `${note} Send the email that opened so tomorrow's run updates both trackers.`;
     const undo = document.createElement('button'); undo.type = 'button'; undo.textContent = 'Undo';
-    undo.addEventListener('click', () => { const x = rejects(); delete x[j.id]; store('shortlist-rejects', JSON.stringify(x)); dash.setStatus(j.id, 'Sent'); toast.hidden = true; });
+    undo.addEventListener('click', () => { const x = local(); delete x[j.id]; save(x); dash.setStatus(j.id, prev.status, prev); toast.hidden = true; });
     toast.replaceChildren(t, undo); toast.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { toast.hidden = true; }, 12000);
     const to = (window.vtOwner && window.vtOwner.email) || '';
-    const body = `Reason: ${reason}
-Job: ${j.link || ''}
+    const body = `${extra.pass_reason ? `Reason: ${extra.pass_reason}
+` : ''}Job: ${j.link || ''}
+Date: ${today()}
 
-Sent from The Shortlist. The morning run marks this job as not for me on both trackers${reason === 'Avoid this company' ? ' and skips this company from now on' : ''}.`;
-    location.href = `mailto:${to}?subject=${encodeURIComponent(`Shortlist reject: ${j.company} – ${j.role} (${j.id})`)}&body=${encodeURIComponent(body)}`;
+Sent from The Shortlist. The morning run updates this job on both trackers.`;
+    location.href = `mailto:${to}?subject=${encodeURIComponent(`Shortlist ${kind}: ${j.company} – ${j.role} (${j.id})`)}&body=${encodeURIComponent(body)}`;
+  };
+  const btn = (label, cls, title, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = label; b.title = title; b.addEventListener('click', fn); return b; };
+  window.vtApplied = (j) => {
+    const box = document.createElement('span'); box.className = 'vt-rej';
+    if (j.status !== 'Sent') return box;
+    box.append(btn('I applied ✓', 'vt-ok-b', `Move ${j.company} to the pipeline`, () =>
+      change(j, 'Applied', { applied_on: today(), followup_due: plus7(), applied_source: 'Marked applied on the Shortlist' }, 'applied', `Applied: ${j.company}. Follow up in 7 days.`)));
+    return box;
   };
   window.vtReject = (j) => {
     const box = document.createElement('span'); box.className = 'vt-rej';
     if (j.status !== 'Sent') return box;
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'vt-rej-b'; b.textContent = 'Not for me ✕';
-    b.title = `Reject ${j.company}: hide it here and tell tomorrow's run`;
-    b.addEventListener('click', () => {
+    const b = btn('Not for me ✕', 'vt-rej-b', `Reject ${j.company}: hide it here and tell tomorrow's run`, () => {
       const pick = document.createElement('span'); pick.className = 'vt-rej-pick'; pick.setAttribute('role', 'group'); pick.setAttribute('aria-label', 'Why not?');
-      REASONS.forEach((reason) => { const c = document.createElement('button'); c.type = 'button'; c.textContent = reason; c.addEventListener('click', () => reject(j, reason)); pick.append(c); });
-      const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = 'Cancel'; x.addEventListener('click', () => box.replaceChildren(b)); pick.append(x);
+      REASONS.forEach((reason) => pick.append(btn(reason, '', reason, () => change(j, 'Passed', { pass_reason: reason }, 'reject', `Not for me: ${j.company}.`))));
+      const x = btn('Cancel', 'x', 'Keep this job', () => box.replaceChildren(b)); pick.append(x);
       box.replaceChildren(pick);
     });
     box.append(b);
     return box;
   };
-  const open = async (raw) => { await dash.unlock(raw); applyRejects(); lock.hidden = true; out.hidden = false; };
+  window.vtPipeActions = (j) => {
+    const box = document.createElement('span'); box.className = 'vt-rej vt-pipe-acts';
+    if (!['Applied', 'Replied', 'Interview'].includes(j.status)) return box;
+    if (j.status !== 'Interview') box.append(btn('Interview', 'vt-ok-b', `${j.company} invited you to interview`, () =>
+      change(j, 'Interview', {}, 'interview', `Interview: ${j.company}. Good luck!`)));
+    box.append(btn('Rejected', 'vt-rej-b', `${j.company} turned this application down`, () =>
+      change(j, 'Rejected', { rejected_on: today() }, 'rejected', `Rejected: ${j.company}. It leaves the pipeline.`)));
+    return box;
+  };
+  const open = async (raw) => { await dash.unlock(raw); applyLocal(); lock.hidden = true; out.hidden = false; };
   const pw = document.getElementById('vt-pw'), hint = document.getElementById('vt-hint'), forgot = document.getElementById('vt-forgot');
   let recovery = false;
   forgot.addEventListener('click', () => {
