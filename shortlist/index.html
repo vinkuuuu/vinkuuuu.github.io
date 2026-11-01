@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>The Shortlist · Vignesh Vasudevan Nair</title>
+<title>The Shortlist</title>
 <meta name="theme-color" content="#070708">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -18,9 +18,9 @@ html, body { margin: 0; background: #070708; }
 .vt-lock .t { font-family: 'Space Mono', monospace; font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: #C8FF00; }
 .vt-lock h1 { font-family: 'Bebas Neue', Impact, sans-serif; font-weight: 400; font-size: clamp(64px, 14vw, 112px); line-height: .85; margin: 0; }
 .vt-lock h1 em { font-style: normal; color: #C8FF00; }
-.vt-lock #vt-pw { width: 100%; box-sizing: border-box; padding: 15px 16px; border-radius: 3px; border: 1px solid rgba(255,255,255,.2);
+.vt-lock #vt-pw, .vt-lock #vt-user { width: 100%; box-sizing: border-box; padding: 15px 16px; border-radius: 3px; border: 1px solid rgba(255,255,255,.2);
   background: #0c0c0f; color: #F5F5F0; font: 15px 'Space Mono', monospace; outline: none; }
-.vt-lock #vt-pw:focus { border-color: #C8FF00; }
+.vt-lock #vt-pw:focus, .vt-lock #vt-user:focus { border-color: #C8FF00; }
 .vt-lock label.r { display: flex; gap: 10px; align-items: center; font-size: 13.5px; color: rgba(245,245,240,.66); }
 .vt-lock button { font: 700 12px 'Space Mono', monospace; letter-spacing: .14em; text-transform: uppercase; padding: 16px 26px; border: 0;
   border-radius: 3px; background: #C8FF00; color: #070708; cursor: pointer; }
@@ -51,11 +51,13 @@ window.dash = (() => {
     if (!c) return { status: 'missing', data: [] };
     try { return { status: 'ok', data: c.fn(...c.inputs.map((i) => get(i).data)) }; } catch (e) { return { status: 'error', data: [] }; }
   };
+  let dir = '';  // this person's folder: u/<slot>/
   const openFile = async (path) => {
-    const buf = new Uint8Array(await (await fetch(path, { cache: 'no-store' })).arrayBuffer());
+    const buf = new Uint8Array(await (await fetch(dir + path, { cache: 'no-store' })).arrayBuffer());
     return crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, key, buf.slice(12));
   };
-  const unlock = async (raw) => {
+  const unlock = async (raw, slot) => {
+    dir = `u/${slot}/`;
     key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
     const all = await Promise.all(files.map((f) => openFile(`data/${f}.json.enc`)));
     files.forEach((f, i) => { src[f] = JSON.parse(new TextDecoder().decode(all[i])); });
@@ -70,15 +72,21 @@ window.dash = (() => {
     j.status = st; Object.assign(j, extra || {});
     cbs.forEach((f) => f());
   };
-  // The data key is wrapped twice: once by the password, once by the recovery code kept in the owner's email.
-  const login = async (secret, recovery) => {
-    const ring = await (await fetch('keyring.json', { cache: 'no-store' })).json();
+  // Each person has a folder named from their username; its data key is wrapped twice: by the password and by the
+  // recovery code kept in that person's email.
+  const slotOf = async (user) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('shortlist:' + user.trim().toLowerCase()))))
+    .map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+  const login = async (user, secret, recovery) => {
+    const slot = await slotOf(user);
+    const res = await fetch(`u/${slot}/keyring.json`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('no such user');
+    const ring = await res.json();
     const s = recovery ? ring.recovery : ring;
     if (recovery) secret = secret.replace(/[\s-]/g, '').toUpperCase();
     const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, ['deriveKey']);
     const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(s.salt), iterations: ring.iterations, hash: 'SHA-256' },
       base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(s.iv) }, kek, b64(s.wrapped)));
+    return { raw: new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(s.iv) }, kek, b64(s.wrapped))), slot };
   };
   return { calc: (id, o) => { calcs[id] = o; }, data: get, onData: (f) => { cbs.push(f); f(); }, login, unlock, openFile, setStatus };
 })();
@@ -87,13 +95,14 @@ window.dash = (() => {
 <body>
 <div class="vt-lock" id="vt-lock">
   <form id="vt-login" autocomplete="on">
-    <span class="t">● Private · Vignesh Vasudevan Nair</span>
+    <span class="t">● Private</span>
     <h1>The<br><em>Shortlist</em></h1>
     <p class="h" id="vt-hint" hidden>Search your Gmail for “Shortlist recovery code” and type the code here.</p>
+    <input type="text" id="vt-user" placeholder="Username" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-label="Username">
     <input type="password" id="vt-pw" placeholder="Password" autocomplete="current-password" required aria-label="Password">
     <label class="r"><input type="checkbox" id="vt-keep"> Keep me signed in on this device</label>
     <button type="submit" id="vt-go">Unlock →</button>
-    <p class="e" id="vt-err" hidden>That password didn’t unlock it.</p>
+    <p class="e" id="vt-err" hidden>That username and password didn’t unlock it.</p>
     <button type="button" class="lnk" id="vt-forgot">Forgot password?</button>
   </form>
 </div>
@@ -324,10 +333,10 @@ window.dash = (() => {
 <div class="vt" id="vt">
   <section class="vt-wrap vt-hero" aria-labelledby="vt-title">
     <div>
-      <span class="vt-tag"><i class="vt-dot"></i>Live · AI job search · Hyd · Blr · Chennai · Vizag</span>
+      <span class="vt-tag"><i class="vt-dot"></i><span id="vt-tagtxt">Live · AI job search</span></span>
       <h1 class="vt-h1" id="vt-title"><span>The</span><span><em>Shortlist</em></span></h1>
-      <p class="vt-by">Vignesh Vasudevan Nair · Big 4 (EY USA) · Amazon · Ferrari Group</p>
-      <p class="vt-lede">Every morning an AI agent reads every new finance posting in four cities, throws out the reposts, checks each job on the company’s own site, and hands me the five I’m most likely to get an interview for, each with its own resume.</p>
+      <p class="vt-by" id="vt-byline"></p>
+      <p class="vt-lede" id="vt-lede">Every morning an AI agent reads the new postings, throws out the reposts, checks each job on the company’s own site and picks the ones most likely to get an interview, each with its own resume.</p>
       <div class="vt-cta">
         <button type="button" class="vt-btn" data-go="vt-five">See today’s five →</button>
         <button type="button" class="vt-btn o" data-go="vt-filter">How it works</button>
@@ -374,7 +383,7 @@ window.dash = (() => {
       <div>
         <p class="vt-eye">// Today’s five · <span data-source="latest" data-field="date" data-row="0">—</span></p>
         <h2 class="vt-h2" id="vt-five-h">Five jobs.<br><em>Zero reposts.</em></h2>
-        <p class="vt-p">Ranked by the odds of an interview call: AP, AR, finance, GL/R2R and FP&amp;A, all asking 1–4 years and no CA or CPA. Tap a card to see why it made the cut.</p>
+        <p class="vt-p" id="vt-five-note">Ranked by the odds of an interview call. Tap a card to see why it made the cut.</p>
       </div>
       <div class="vt-chips" id="vt-chips" role="group" aria-label="Filter by role family"></div>
     </div>
@@ -403,8 +412,8 @@ window.dash = (() => {
         <p class="vt-eye">// How the five were chosen</p>
         <h2 class="vt-h2" id="vt-filter-h"><span data-source="search_today" data-field="n" data-row="0">—</span> in.<br><em><span id="vt-out" data-source="search_today" data-field="n">—</span> out.</em></h2>
         <p class="vt-p">Reposts are caught by their LinkedIn job ID, which rises about 430,000 a day, so a two-month-old job in a “last 24 hours” list gives itself away.</p>
-        <div class="vt-cut" aria-label="What gets cut"><span>Reposts</span><span>5+ years</span><span>CA · CPA · CMA · ACCA</span><span>Internal audit</span><span>Product control</span><span>Calling roles</span><span>Senior titles</span></div>
-        <div class="vt-cut in" aria-label="What gets in"><span>AP</span><span>AR</span><span>Finance associate</span><span>GL · R2R</span><span>FP&amp;A</span><span>1–4 years</span><span>Posted in 24–48 h</span></div>
+        <div class="vt-cut" id="vt-cut-out" aria-label="What gets cut"><span>Reposts</span></div>
+        <div class="vt-cut in" id="vt-cut-in" aria-label="What gets in"></div>
       </div>
       <div class="vt-steps vt-rv" id="vt-steps"></div>
     </div>
@@ -417,7 +426,7 @@ window.dash = (() => {
       <p class="vt-p">A job moves here when the company’s confirmation email lands, or when you tap “I applied” on your site’s Shortlist (for LinkedIn Easy Apply, which sends no email). Rejections leave the pipeline and are listed underneath.</p>
     </div>
     <div class="vt-goal vt-rv">
-      <div><small>Interview calls · goal 5 by 26 Dec</small><br><b><span data-source="totals" data-field="interviews">—</span> / 5</b></div>
+      <div><small id="vt-goal-txt">Interview calls · goal 5</small><br><b><span data-source="totals" data-field="interviews">—</span> / 5</b></div>
       <div class="vt-segs" id="vt-segs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     </div>
     <div class="vt-cols vt-rv" id="vt-cols"></div>
@@ -528,7 +537,7 @@ window.dash = (() => {
       if (d.reposts_removed != null) rows.push({ step: 'After removing reposts', n: Number(d.scanned) - Number(d.reposts_removed) });
       rows.push({ step: 'Right role, level and city', n: Number(d.after_filters) });
       rows.push({ step: 'Read in full', n: Number(d.read_in_full) });
-      if (d.eligible != null) rows.push({ step: '1–4 years, no CA/CPA/CMA', n: Number(d.eligible) });
+      if (d.eligible != null) rows.push({ step: (window.vtOwner && window.vtOwner.eligible_step) || '1–4 years, no CA/CPA/CMA', n: Number(d.eligible) });
       rows.push({ step: 'Shortlisted', n: Number(d.sent) });
       return rows;
     },
@@ -845,11 +854,10 @@ window.dash = (() => {
   const KEEP = ['status', 'applied_on', 'followup_due', 'applied_source', 'pass_reason', 'rejected_on'];
   const local = () => {
     let r = {};
-    try { r = JSON.parse(read('shortlist-status') || '{}'); } catch (e) {}
-    try { const old = JSON.parse(read('shortlist-rejects') || '{}'); Object.keys(old).forEach((id) => { r[id] = r[id] || { status: 'Passed', extra: { pass_reason: old[id].reason } }; }); } catch (e) {}
+    try { r = JSON.parse(read(`shortlist-status:${slot}`) || '{}'); } catch (e) {}
     return r;
   };
-  const save = (r) => { store('shortlist-status', JSON.stringify(r)); store('shortlist-rejects', null); };
+  const save = (r) => { store(`shortlist-status:${slot}`, JSON.stringify(r)); };
   const applyLocal = () => {
     const r = local();
     const jobs = dash.data('jobs').data || [];
@@ -907,7 +915,18 @@ Sent from The Shortlist. The morning run updates this job on both trackers.`;
       change(j, 'Rejected', { rejected_on: today() }, 'rejected', `Rejected: ${j.company}. It leaves the pipeline.`)));
     return box;
   };
-  const open = async (raw) => { await dash.unlock(raw); applyLocal(); lock.hidden = true; out.hidden = false; };
+  // The signed-in person's own page text (name, byline, search rules, goal) comes from their encrypted profile
+  const setText = (id, t) => { const n = document.getElementById(id); if (n && t) n.textContent = t; };
+  const setChips = (id, list) => { const n = document.getElementById(id); if (n && Array.isArray(list)) n.replaceChildren(...list.map((t) => { const s = document.createElement('span'); s.textContent = t; return s; })); };
+  const applyProfile = (p) => {
+    if (!p) return;
+    if (p.name) document.title = `The Shortlist · ${p.name}`;
+    setText('vt-tagtxt', p.tagline); setText('vt-byline', p.byline); setText('vt-lede', p.lede); setText('vt-five-note', p.five_note);
+    setText('vt-goal-txt', p.goal_text); setChips('vt-cut-out', p.cut_out); setChips('vt-cut-in', p.cut_in);
+    if (p.goal_date) setText('vt-days', String(Math.max(0, Math.ceil((new Date(p.goal_date + 'T00:00:00Z').getTime() - Date.now()) / 864e5))));
+  };
+  let slot = '';
+  const open = async (raw, s) => { slot = s; await dash.unlock(raw, s); applyProfile(window.vtOwner); applyLocal(); lock.hidden = true; out.hidden = false; };
   const pw = document.getElementById('vt-pw'), hint = document.getElementById('vt-hint'), forgot = document.getElementById('vt-forgot');
   let recovery = false;
   forgot.addEventListener('click', () => {
@@ -920,18 +939,19 @@ Sent from The Shortlist. The morning run updates this job on both trackers.`;
     forgot.textContent = recovery ? 'Use my password instead' : 'Forgot password?';
     pw.focus();
   });
-  const saved = read('shortlist-key');
-  if (saved) open(unb64(saved)).catch(() => store('shortlist-key', null));
+  store('shortlist-key', null); store('shortlist-status', null); store('shortlist-rejects', null);  // single-user leftovers
+  let saved = null; try { saved = JSON.parse(read('shortlist-session') || 'null'); } catch (e) {}
+  if (saved && saved.slot && saved.key) open(unb64(saved.key), saved.slot).catch(() => store('shortlist-session', null));
   document.getElementById('vt-login').addEventListener('submit', async (e) => {
     e.preventDefault(); err.hidden = true; go.disabled = true;
     try {
-      const raw = await dash.login(pw.value, recovery);
-      if (document.getElementById('vt-keep').checked) store('shortlist-key', b64(raw));
-      await open(raw);
+      const { raw, slot: s } = await dash.login(document.getElementById('vt-user').value, pw.value, recovery);
+      if (document.getElementById('vt-keep').checked) store('shortlist-session', JSON.stringify({ slot: s, key: b64(raw) }));
+      await open(raw, s);
       document.getElementById('vt-note').hidden = !recovery;
     } catch (x) { err.hidden = false; } finally { go.disabled = false; }
   });
-  out.addEventListener('click', () => { store('shortlist-key', null); location.reload(); });
+  out.addEventListener('click', () => { store('shortlist-session', null); location.reload(); });
   // Tailored resumes are encrypted too: decrypt on click and hand the PDF over as a download.
   document.addEventListener('click', async (e) => {
     const a = e.target.closest('a[href^="resumes/"]');
