@@ -338,7 +338,7 @@ window.dash = (() => {
       <p class="vt-by" id="vt-byline"></p>
       <p class="vt-lede" id="vt-lede">Every morning an AI agent reads the new postings, throws out the reposts, checks each job on the company’s own site and picks the ones most likely to get an interview, each with its own resume.</p>
       <div class="vt-cta">
-        <button type="button" class="vt-btn" data-go="vt-five">See today’s five →</button>
+        <button type="button" class="vt-btn" data-go="vt-five">See today’s <span class="vt-nw">five</span> →</button>
         <button type="button" class="vt-btn o" data-go="vt-filter">How it works</button>
       </div>
     </div>
@@ -381,8 +381,8 @@ window.dash = (() => {
   <section class="vt-wrap vt-sec" id="vt-five" aria-labelledby="vt-five-h">
     <div class="vt-head vt-rv">
       <div>
-        <p class="vt-eye">// Today’s five · <span data-source="latest" data-field="date" data-row="0">—</span></p>
-        <h2 class="vt-h2" id="vt-five-h">Five jobs.<br><em>Zero reposts.</em></h2>
+        <p class="vt-eye">// Today’s <span class="vt-nw">five</span> · <span data-source="latest" data-field="date" data-row="0">—</span></p>
+        <h2 class="vt-h2" id="vt-five-h"><span class="vt-nW">Five</span> jobs.<br><em>Zero reposts.</em></h2>
         <p class="vt-p" id="vt-five-note">Ranked by the odds of an interview call. Tap a card to see why it made the cut.</p>
       </div>
       <div class="vt-chips" id="vt-chips" role="group" aria-label="Filter by role family"></div>
@@ -486,7 +486,7 @@ window.dash = (() => {
     description: 'Jobs in the most recent shortlist, best first.',
     fn: (jobs) => {
       const last = jobs.reduce((m, j) => (j.sent_at > m ? j.sent_at : m), '');
-      return jobs.filter((j) => j.sent_at === last && (j.status === 'Sent' || j.status === 'Reserve')).sort((a, b) => Number(a.rank) - Number(b.rank)).slice(0, 5);
+      return jobs.filter((j) => j.sent_at === last && (j.status === 'Sent' || j.status === 'Reserve')).sort((a, b) => Number(a.rank) - Number(b.rank)).slice(0, (window.vtOwner && window.vtOwner.picks) || 5);  // Varun sees more picks
     },
   });
 
@@ -879,6 +879,7 @@ window.dash = (() => {
     undo.addEventListener('click', () => { const x = local(); delete x[j.id]; save(x); dash.setStatus(j.id, prev.status, prev); toast.hidden = true; });
     toast.replaceChildren(t, undo); toast.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { toast.hidden = true; }, 12000);
     const to = (window.vtOwner && window.vtOwner.email) || '';
+    if (!to) { t.textContent = `${note} Saved on this device. Tell Claude in chat so your list stays in sync.`; return; }  // owners without email (Varun)
     const body = `${extra.pass_reason ? `Reason: ${extra.pass_reason}
 ` : ''}Job: ${j.link || ''}
 Date: ${today()}
@@ -922,6 +923,7 @@ Sent from The Shortlist. The morning run updates this job on both trackers.`;
     if (!p) return;
     if (p.name) document.title = `The Shortlist · ${p.name}`;
     setText('vt-tagtxt', p.tagline); setText('vt-byline', p.byline); setText('vt-lede', p.lede); setText('vt-five-note', p.five_note);
+    if (p.picks_word) { document.querySelectorAll('.vt-nw').forEach((x) => { x.textContent = p.picks_word; }); document.querySelectorAll('.vt-nW').forEach((x) => { x.textContent = p.picks_word[0].toUpperCase() + p.picks_word.slice(1); }); }
     setText('vt-goal-txt', p.goal_text); setChips('vt-cut-out', p.cut_out); setChips('vt-cut-in', p.cut_in);
     if (p.goal_date) setText('vt-days', String(Math.max(0, Math.ceil((new Date(p.goal_date + 'T00:00:00Z').getTime() - Date.now()) / 864e5))));
   };
